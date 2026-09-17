@@ -21,7 +21,7 @@ self.addEventListener("push", function (event) {
     data = { title: "La Cabana Grill", body: event.data ? event.data.text() : "" };
   }
 
-  var title = data.title || "La Cabana Grill";
+  var title = data.title || "La Cabaña Grill";
   var options = {
     body: data.body || "",
     icon: "icon.png",
@@ -30,7 +30,27 @@ self.addEventListener("push", function (event) {
     data: { url: data.url || "/" }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Tell any open app window a real push arrived, so the Notificaciones
+  // tab and the order-status screen can reflect it immediately instead of
+  // only finding out the next time the OS-level notification is tapped.
+  // tag looks like "order-1042" for an order-ready push, or
+  // "cabana-<category>" for a category broadcast (see api/push-send.js).
+  function notifyClients() {
+    return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      var tag = data.tag || "";
+      var msg;
+      if (tag.indexOf("order-") === 0) {
+        msg = { type: "orderReady", orderNo: tag.slice(6), title: title, body: data.body || "" };
+      } else {
+        msg = { type: "push", title: title, body: data.body || "", category: tag.replace(/^cabana-/, "") };
+      }
+      clientList.forEach(function (client) { client.postMessage(msg); });
+    });
+  }
+
+  event.waitUntil(
+    Promise.all([self.registration.showNotification(title, options), notifyClients()])
+  );
 });
 
 // Tapping a notification focuses an already-open app tab if there is one,

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Cabana Grill — Notifications</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root{
+    --bg:#000000; --surface:#0a0a0a; --surface-2:#161616;
+    --ink:#ffffff; --ink-soft:#d7d7d7; --ink-faint:#8f8f8f;
+    --line:rgba(255,255,255,.16);
+    --accent:#e8964a; --accent-strong:#c97a2f; --accent-ink:#000000;
+    --danger:#e08064;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Work Sans',system-ui,-apple-system,sans-serif;}
+  .wrap{max-width:480px;margin:0 auto;padding:24px 18px 60px;}
+  h1{font-size:20px;margin:0 0 4px;}
+  .sub{color:var(--ink-faint);font-size:13px;margin:0 0 24px;}
+  label{display:block;font-size:13px;font-weight:700;margin:16px 0 6px;color:var(--ink-soft);}
+  input[type=text], input[type=password], textarea, select{
+    width:100%;background:var(--surface);border:1.5px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:11px 12px;font-size:14.5px;font-family:inherit;
+  }
+  textarea{min-height:80px;resize:vertical;}
+  .radio-list{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  .radio-row{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;}
+  .radio-row input{width:16px;height:16px;accent-color:var(--accent-strong);}
+  .radio-row.checked{border-color:var(--accent-strong);background:rgba(232,150,74,.1);}
+  button{
+    font-family:inherit;cursor:pointer;width:100%;padding:14px;border-radius:12px;border:none;
+    background:var(--accent-strong);color:var(--accent-ink);font-weight:800;font-size:15px;margin-top:22px;
+  }
+  button:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:14px;font-size:13.5px;padding:10px 12px;border-radius:10px;display:none;}
+  .msg.ok{display:block;background:rgba(120,200,140,.12);color:#8fd6a2;}
+  .msg.err{display:block;background:rgba(224,128,100,.12);color:var(--danger);}
+  #gate{max-width:340px;margin:80px auto;padding:0 18px;text-align:center;}
+  #gate p{color:var(--ink-faint);font-size:13px;}
+  .hidden{display:none;}
+  .orderNoWrap{margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>La Cabana Grill</h1>
+  <p>Enter the admin key to send a notification.</p>
+  <input type="password" id="secretInput" placeholder="Admin key">
+  <button id="unlockBtn" style="margin-top:14px;">Unlock</button>
+  <div class="msg err" id="gateMsg"></div>
+</div>
+
+<div class="wrap hidden" id="app">
+  <h1>Send a notification</h1>
+  <p class="sub">Goes out instantly to everyone who has that category turned on in the app.</p>
+
+  <label>Who gets it</label>
+  <div class="radio-list" id="audienceList">
+    <label class="radio-row"><input type="radio" name="audience" value="order"> <span><b>Order ready</b> — just one customer, by order number</span></label>
+    <label class="radio-row"><input type="radio" name="audience" value="specials" checked> <span><b>Daily specials</b> — everyone subscribed to specials</span></label>
+    <label class="radio-row"><input type="radio" name="audience" value="membership"> <span><b>Membership perks</b> — Cabana Lunch Club subscribers</span></label>
+    <label class="radio-row"><input type="radio" name="audience" value="new_items"> <span><b>New menu items</b></span></label>
+    <label class="radio-row"><input type="radio" name="audience" value="winback"> <span><b>Win-back offer</b> — customers who haven't ordered in a while</span></label>
+    <label class="radio-row"><input type="radio" name="audience" value="all"> <span><b>Everyone</b> — all subscribers, any category</span></label>
+  </div>
+
+  <div class="orderNoWrap hidden" id="orderNoWrap">
+    <label>Order number</label>
+    <input type="text" id="orderNoInput" placeholder="e.g. 1042">
+  </div>
+
+  <label>Title</label>
+  <input type="text" id="titleInput" placeholder="e.g. Your order is ready!" maxlength="60">
+
+  <label>Message</label>
+  <textarea id="bodyInput" placeholder="e.g. Order #1042 is ready for pickup at the counter." maxlength="180"></textarea>
+
+  <button id="sendBtn">Send notification</button>
+  <div class="msg" id="sendMsg"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var secret = "";
+
+  var gate = document.getElementById("gate");
+  var app = document.getElementById("app");
+  var gateMsg = document.getElementById("gateMsg");
+
+  document.getElementById("unlockBtn").addEventListener("click", function(){
+    var val = document.getElementById("secretInput").value.trim();
+    if (!val){
+      gateMsg.textContent = "Enter the admin key first.";
+      gateMsg.style.display = "block";
+      return;
+    }
+    secret = val;
+    gate.classList.add("hidden");
+    app.classList.remove("hidden");
+    try { sessionStorage.setItem("cabanaAdminKey", val); } catch(e){}
+  });
+
+  // Convenience: if this browser already unlocked once this tab session,
+  // skip the gate. Never persisted beyond the tab (sessionStorage).
+  try {
+    var saved = sessionStorage.getItem("cabanaAdminKey");
+    if (saved){
+      secret = saved;
+      gate.classList.add("hidden");
+      app.classList.remove("hidden");
+    }
+  } catch(e){}
+
+  var orderNoWrap = document.getElementById("orderNoWrap");
+  document.querySelectorAll('input[name="audience"]').forEach(function(radio){
+    radio.addEventListener("change", function(){
+      document.querySelectorAll(".radio-row").forEach(function(row){ row.classList.remove("checked"); });
+      radio.closest(".radio-row").classList.add("checked");
+      orderNoWrap.classList.toggle("hidden", radio.value !== "order");
+    });
+  });
+  var checkedDefault = document.querySelector('input[name="audience"]:checked');
+  if (checkedDefault) checkedDefault.closest(".radio-row").classList.add("checked");
+
+  document.getElementById("sendBtn").addEventListener("click", function(){
+    var audience = document.querySelector('input[name="audience"]:checked').value;
+    var title = document.getElementById("titleInput").value.trim();
+    var body = document.getElementById("bodyInput").value.trim();
+    var orderNo = document.getElementById("orderNoInput").value.trim();
+    var msgEl = document.getElementById("sendMsg");
+    msgEl.className = "msg";
+    msgEl.style.display = "none";
+
+    if (!title || !body){
+      msgEl.textContent = "Add a title and a message first.";
+      msgEl.className = "msg err";
+      return;
+    }
+    if (audience === "order" && !orderNo){
+      msgEl.textContent = "Enter the order number.";
+      msgEl.className = "msg err";
+      return;
+    }
+
+    var payload = { secret: secret, title: title, body: body };
+    if (audience === "order") payload.orderNo = orderNo;
+    else payload.category = audience;
+
+    var btn = document.getElementById("sendBtn");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+
+    fetch("/api/push-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function(r){ return r.json().then(function(data){ return {status:r.status, data:data}; }); })
+      .then(function(res){
+        btn.disabled = false;
+        btn.textContent = "Send notification";
+        if (res.status === 401){
+          msgEl.textContent = "Wrong admin key.";
+          msgEl.className = "msg err";
+          try { sessionStorage.removeItem("cabanaAdminKey"); } catch(e){}
+          return;
+        }
+        if (res.status >= 400){
+          msgEl.textContent = res.data.error || "Something went wrong.";
+          msgEl.className = "msg err";
+          return;
+        }
+        msgEl.textContent = "Sent to " + res.data.sent + " subscriber(s)." + (res.data.failed ? " (" + res.data.failed + " failed.)" : "");
+        msgEl.className = "msg ok";
+        document.getElementById("titleInput").value = "";
+        document.getElementById("bodyInput").value = "";
+      })
+      .catch(function(){
+        btn.disabled = false;
+        btn.textContent = "Send notification";
+        msgEl.textContent = "Network error — try again.";
+        msgEl.className = "msg err";
+      });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "la-cabana-grill-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "La Cabana Grill ordering app + serverless API (checkout, push notifications).",
+  "dependencies": {
+    "web-push": "^3.6.7",
+    "@vercel/kv": "^2.0.0"
+  }
+}
